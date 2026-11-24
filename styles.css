@@ -931,3 +931,22 @@ p {
   border-radius: var(--r-2);
 }
 
+.admin-note {
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--color-muted);
+}
+
+.admin-item-lead {
+  align-items: flex-start;
+}
+
+.admin-lead-msg {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--color-muted);
+  white-space: pre-wrap;
+}
+
