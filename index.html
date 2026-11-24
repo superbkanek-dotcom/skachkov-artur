@@ -433,14 +433,14 @@
           </div>
         </div>
 
-        <form class="contact-form" onsubmit="event.preventDefault(); this.querySelector('.form-msg').textContent='Спасибо! Свяжусь с вами в течение дня.';">
+        <form class="contact-form" id="contactForm">
           <div class="field">
             <label for="name">Имя</label>
             <input type="text" id="name" name="name" placeholder="Как к вам обращаться" required />
           </div>
           <div class="field">
-            <label for="contact">Телефон или Telegram</label>
-            <input type="text" id="contact" name="contact" placeholder="@username или +7 ..." required />
+            <label for="f-contact">Телефон или Telegram</label>
+            <input type="text" id="f-contact" name="contact" placeholder="@username или +7 ..." required />
           </div>
           <div class="field full">
             <label for="type">Тип проекта</label>
@@ -544,6 +544,13 @@
         <span class="caption" id="adminCount"></span>
       </div>
       <ul class="admin-list" id="adminList"></ul>
+
+      <div class="admin-list-head">
+        <h3>Заявки</h3>
+        <span class="caption" id="adminLeadsCount"></span>
+      </div>
+      <p class="admin-note">Сюда попадают заявки из формы «Расскажите о вашем бизнесе». Они сохраняются в том браузере, где форму заполнили: посетители с других устройств свои заявки сюда не передадут — для этого нужно внешнее хранилище (например, Google-таблица).</p>
+      <ul class="admin-list" id="adminLeads"></ul>
     </div>
   </div>
 
@@ -552,6 +559,7 @@
       'use strict';
 
       const STORAGE_KEY = 'orlov_works_v1';
+      const LEADS_KEY = 'orlov_leads_v1';
       const CAT_LABELS = { site: 'Сайт', bot: 'Бот', both: 'Связка' };
 
       const grid = document.getElementById('worksGrid');
@@ -563,8 +571,12 @@
       const adminCount = document.getElementById('adminCount');
       const adminForm = document.getElementById('adminForm');
       const adminStatus = document.getElementById('adminStatus');
+      const contactForm = document.getElementById('contactForm');
+      const adminLeads = document.getElementById('adminLeads');
+      const adminLeadsCount = document.getElementById('adminLeadsCount');
 
       let projects = [];
+      let leads = [];
       let filter = 'all';
 
       /* ---------- утилиты ---------- */
@@ -695,6 +707,73 @@
         return null;
       }
 
+      /* ---------- заявки из формы ---------- */
+      function saveLeads() {
+        try { localStorage.setItem(LEADS_KEY, JSON.stringify(leads)); } catch (e) { /* хранилище недоступно */ }
+      }
+
+      function restoreLeads() {
+        try {
+          const raw = localStorage.getItem(LEADS_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        } catch (e) { /* игнорируем повреждённые данные */ }
+        return [];
+      }
+
+      /* ISO-дату из input[type=date] показываем как ДД.ММ.ГГГГ */
+      function formatDay(value) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+        return m ? m[3] + '.' + m[2] + '.' + m[1] : '';
+      }
+
+      function formatMoment(iso) {
+        const d = new Date(iso);
+        return isNaN(d.getTime()) ? '' : d.toLocaleString('ru-RU', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      }
+
+      function renderLeads() {
+        adminLeadsCount.textContent = leads.length + ' ' + plural(leads.length, ['заявка', 'заявки', 'заявок']);
+        if (!leads.length) {
+          adminLeads.innerHTML = '<li class="admin-empty">Пока нет ни одной заявки.</li>';
+          return;
+        }
+        adminLeads.innerHTML = leads.map(l => {
+          const when = formatDay(l.when);
+          return '<li class="admin-item admin-item-lead">' +
+            '<div>' +
+              '<div class="admin-item-title">' + esc(l.name) + ' · ' + esc(l.contact) + '</div>' +
+              '<div class="caption">' + esc(l.type) + (when ? ' · запуск ' + when : '') + ' · получена ' + esc(formatMoment(l.created)) + '</div>' +
+              (l.msg ? '<div class="admin-lead-msg">' + esc(l.msg) + '</div>' : '') +
+            '</div>' +
+            '<button type="button" class="btn btn-secondary btn-sm admin-del admin-lead-del" data-id="' + esc(l.id) + '">Удалить</button>' +
+          '</li>';
+        }).join('');
+      }
+
+      contactForm.addEventListener('submit', e => {
+        e.preventDefault();
+        const lead = {
+          id: uid(),
+          name: document.getElementById('name').value.trim(),
+          contact: document.getElementById('f-contact').value.trim(),
+          type: document.getElementById('type').value,
+          when: document.getElementById('date').value,
+          msg: document.getElementById('msg').value.trim(),
+          created: new Date().toISOString()
+        };
+        leads.unshift(lead);
+        saveLeads();
+        renderLeads();
+        contactForm.reset();
+        contactForm.querySelector('.form-msg').textContent =
+          'Спасибо, ' + lead.name + '! Заявка отправлена — свяжусь с вами в течение дня.';
+      });
+
       /* ---------- фильтр работ ---------- */
       Array.prototype.forEach.call(filterBtns, btn => {
         btn.addEventListener('click', () => {
@@ -756,6 +835,17 @@
         adminStatus.textContent = 'Проект «' + removed.title + '» удалён.';
       });
 
+      adminLeads.addEventListener('click', e => {
+        const btn = e.target.closest('.admin-lead-del');
+        if (!btn) return;
+        const idx = leads.findIndex(l => l.id === btn.dataset.id);
+        if (idx === -1) return;
+        leads.splice(idx, 1);
+        saveLeads();
+        renderLeads();
+        adminStatus.textContent = 'Заявка удалена.';
+      });
+
       /* ---------- сочетание клавиш A + B + H ---------- */
       const COMBO = ['a', 'b', 'h'];
       const held = new Set();
@@ -789,6 +879,9 @@
         save();
       }
       render();
+
+      leads = restoreLeads();
+      renderLeads();
     })();
   </script>
 
