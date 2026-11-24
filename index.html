@@ -785,6 +785,16 @@
       });
 
       /* ---------- админ-панель ---------- */
+      const ADMIN_PASS = 'zxcdota666';
+
+      function askPassword() {
+        const pass = window.prompt('Введите пароль администратора');
+        if (pass === null) return false;
+        if (pass === ADMIN_PASS) return true;
+        window.alert('Неверный пароль');
+        return false;
+      }
+
       function openAdmin() {
         adminPanel.hidden = false;
         document.body.style.overflow = 'hidden';
@@ -865,7 +875,7 @@
         held.add(e.key.toLowerCase());
         if (COMBO.every(k => held.has(k))) {
           held.clear();
-          if (adminPanel.hidden) openAdmin();
+          if (adminPanel.hidden && askPassword()) openAdmin();
         }
       });
 
